@@ -39,36 +39,6 @@ import org.geometerplus.fbreader.bookmodel.BookReadingException;
 import org.geometerplus.fbreader.Paths;
 
 public class Book {
-	public static Book getById(long bookId) {
-		final Book book = BooksDatabase.Instance().loadBook(bookId);
-		if (book == null) {
-			return null;
-		}
-		book.loadLists();
-
-		final ZLFile bookFile = book.File;
-		final ZLPhysicalFile physicalFile = bookFile.getPhysicalFile();
-		if (physicalFile == null) {
-			return book;
-		}
-		if (!physicalFile.exists()) {
-			return null;
-		}
-
-		FileInfoSet fileInfos = new FileInfoSet(physicalFile);
-		if (fileInfos.check(physicalFile, physicalFile != bookFile)) {
-			return book;
-		}
-		fileInfos.save();
-
-		try {
-			book.readMetaInfo();
-			return book;
-		} catch (BookReadingException e) {
-			return null;
-		}
-	}
-
 	public static Book getByFile(ZLFile bookFile) {
 		if (bookFile == null) {
 			return null;
@@ -196,7 +166,7 @@ public class Book {
 		}
 	}
 
-	private void loadLists() {
+	void loadLists() {
 		final BooksDatabase database = BooksDatabase.Instance();
 		myAuthors = database.loadAuthors(myId);
 		myTags = database.loadTags(myId);
@@ -284,8 +254,8 @@ public class Book {
 		return mySeriesInfo;
 	}
 
-	void setSeriesInfoWithNoCheck(String name, BigDecimal index) {
-		mySeriesInfo = new SeriesInfo(name, index);
+	void setSeriesInfoWithNoCheck(String name, String index) {
+		mySeriesInfo = SeriesInfo.createSeriesInfo(name, index);
 	}
 
 	public void setSeriesInfo(String name, String index) {
@@ -301,7 +271,7 @@ public class Book {
 		} else if (name == null) {
 			mySeriesInfo = null;
 			myIsSaved = false;
-		} else if (!name.equals(mySeriesInfo.Name) || mySeriesInfo.Index != index) {
+		} else if (!name.equals(mySeriesInfo.Title) || mySeriesInfo.Index != index) {
 			mySeriesInfo = new SeriesInfo(name, index);
 			myIsSaved = false;
 		}
@@ -321,7 +291,9 @@ public class Book {
 	public String getEncoding() {
 		if (myEncoding == null) {
 			try {
+				System.err.println("detect encoding for " + getId());
 				getPlugin().detectLanguageAndEncoding(this);
+				System.err.println("detected encoding for " + getId() + " = " + myEncoding);
 			} catch (BookReadingException e) {
 			}
 			if (myEncoding == null) {
@@ -380,7 +352,7 @@ public class Book {
 		if (myTitle != null && ZLMiscUtil.matchesIgnoreCase(myTitle, pattern)) {
 			return true;
 		}
-		if (mySeriesInfo != null && ZLMiscUtil.matchesIgnoreCase(mySeriesInfo.Name, pattern)) {
+		if (mySeriesInfo != null && ZLMiscUtil.matchesIgnoreCase(mySeriesInfo.Title, pattern)) {
 			return true;
 		}
 		if (myAuthors != null) {

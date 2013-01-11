@@ -36,14 +36,19 @@ import org.geometerplus.zlibrary.ui.android.R;
 import org.geometerplus.fbreader.fbreader.FBReaderApp;
 import org.geometerplus.fbreader.library.*;
 
+import org.geometerplus.android.fbreader.libraryService.*;
 import org.geometerplus.android.util.UIUtil;
 
 public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuItemClickListener {
+	static final String CURRENT_BOOK_KEY = "fbreader.currentBook";
+
 	private static final int OPEN_ITEM_ID = 0;
 	private static final int EDIT_ITEM_ID = 1;
 	private static final int DELETE_ITEM_ID = 2;
 
-	List<Bookmark> AllBooksBookmarks;
+	private final BookCollectionShadow myCollection = new BookCollectionShadow(this);
+
+	private List<Bookmark> myAllBooksBookmarks;
 	private final List<Bookmark> myThisBookBookmarks = new LinkedList<Bookmark>();
 	private final List<Bookmark> mySearchResults = new LinkedList<Bookmark>();
 
@@ -79,14 +84,16 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 
 		final TabHost host = getTabHost();
 		LayoutInflater.from(this).inflate(R.layout.bookmarks, host.getTabContentView(), true);
+	}
 
-		AllBooksBookmarks = Library.Instance().allBookmarks();
-		Collections.sort(AllBooksBookmarks, new Bookmark.ByTimeComparator());
-		final FBReaderApp fbreader = (FBReaderApp)FBReaderApp.Instance();
+	private void init() {
+		myAllBooksBookmarks = new ArrayList<Bookmark>(myCollection.allBookmarks());
+		Collections.sort(myAllBooksBookmarks, new Bookmark.ByTimeComparator());
 
-		if (fbreader.Model != null) {
-			final long bookId = fbreader.Model.Book.getId();
-			for (Bookmark bookmark : AllBooksBookmarks) {
+		final Book book = SerializerUtil.deserializeBook(getIntent().getStringExtra(CURRENT_BOOK_KEY));
+		if (book != null) {
+			final long bookId = book.getId();
+			for (Bookmark bookmark : myAllBooksBookmarks) {
 				if (bookmark.getBookId() == bookId) {
 					myThisBookBookmarks.add(bookmark);
 				}
@@ -99,7 +106,7 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 		}
 
 		myAllBooksView = createTab("allBooks", R.id.all_books);
-		new BookmarksAdapter(myAllBooksView, AllBooksBookmarks, false);
+		new BookmarksAdapter(myAllBooksView, myAllBooksBookmarks, false);
 
 		findViewById(R.id.search_results).setVisibility(View.GONE);
 	}
@@ -107,6 +114,15 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 	@Override
 	protected void onStart() {
 		super.onStart();
+
+		myCollection.bindToService(new Runnable() {
+			public void run() {
+				if (myAllBooksBookmarks == null) {
+					init();
+				}
+			}
+		});
+
 		OrientationUtil.setOrientation(this, getIntent());
 	}
 
@@ -122,7 +138,7 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 
 		final LinkedList<Bookmark> bookmarks = new LinkedList<Bookmark>();
 		pattern = pattern.toLowerCase();
-		for (Bookmark b : AllBooksBookmarks) {
+		for (Bookmark b : myAllBooksBookmarks) {
 			if (ZLMiscUtil.matchesIgnoreCase(b.getText(), pattern)) {
 				bookmarks.add(b);
 			}
@@ -135,11 +151,9 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 	}
 
 	@Override
-	public void onPause() {
-		for (Bookmark bookmark : AllBooksBookmarks) {
-			bookmark.save();
-		}
-		super.onPause();
+	protected void onStop() {
+		myCollection.unbind();
+		super.onStop();
 	}
 
 	@Override
@@ -208,9 +222,9 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 				// TODO: implement
 				return true;
 			case DELETE_ITEM_ID:
-				bookmark.delete();
+				myCollection.deleteBookmark(bookmark);
 				myThisBookBookmarks.remove(bookmark);
-				AllBooksBookmarks.remove(bookmark);
+				myAllBooksBookmarks.remove(bookmark);
 				mySearchResults.remove(bookmark);
 				invalidateAllViews();
 				return true;
@@ -222,18 +236,20 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 		final FBReaderApp fbreader = (FBReaderApp)FBReaderApp.Instance();
 		final Bookmark bookmark = fbreader.addBookmark(20, true);
 		if (bookmark != null) {
+			myCollection.saveBookmark(bookmark);
 			myThisBookBookmarks.add(0, bookmark);
-			AllBooksBookmarks.add(0, bookmark);
+			myAllBooksBookmarks.add(0, bookmark);
 			invalidateAllViews();
 		}
 	}
 
 	private void gotoBookmark(Bookmark bookmark) {
-		bookmark.onOpen();
+		bookmark.markAsAccessed();
+		myCollection.saveBookmark(bookmark);
 		final FBReaderApp fbreader = (FBReaderApp)FBReaderApp.Instance();
 		final long bookId = bookmark.getBookId();
 		if (fbreader.Model == null || fbreader.Model.Book.getId() != bookId) {
-			final Book book = Book.getById(bookId);
+			final Book book = myCollection.getBookById(bookId);
 			if (book != null) {
 				finish();
 				fbreader.openBook(book, bookmark, null);

@@ -17,17 +17,12 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.android.fbreader;
+package org.geometerplus.fbreader.library;
 
-import android.content.Intent;
+abstract class AbstractSerializer {
+	public abstract String serialize(Book book);
+	public abstract Book deserializeBook(String xml);
 
-import org.geometerplus.zlibrary.ui.android.library.ZLAndroidApplication;
-import org.geometerplus.android.fbreader.libraryService.LibraryService;
-
-public class FBReaderApplication extends ZLAndroidApplication {
-	@Override
-	public void onCreate() {
-		super.onCreate();
-		startService(new Intent(this, LibraryService.class));
-	}
+	public abstract String serialize(Bookmark bookmark);
+	public abstract Bookmark deserializeBookmark(String xml);
 }

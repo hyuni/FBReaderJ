@@ -19,6 +19,8 @@
 
 package org.geometerplus.android.fbreader.libraryService;
 
+import java.util.List;
+
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
@@ -27,21 +29,70 @@ import org.geometerplus.fbreader.library.*;
 
 import org.geometerplus.android.fbreader.library.SQLiteBooksDatabase;
 
-public class LibraryService extends Service implements Library.ChangeListener {
+public class LibraryService extends Service {
 	public final class LibraryImplementation extends LibraryInterface.Stub {
-		private final AbstractLibrary myBaseLibrary;
+		private final BookCollection myCollection;
 
 		LibraryImplementation() {
 			BooksDatabase database = SQLiteBooksDatabase.Instance();
 			if (database == null) {
 				database = new SQLiteBooksDatabase(LibraryService.this, "LIBRARY SERVICE");
 			}
-			myBaseLibrary = new Library(database);
-			((Library)myBaseLibrary).startBuild();
+			myCollection = new BookCollection(database);
+			final long start = System.currentTimeMillis();
+			myCollection.addListener(new BookCollection.Listener() {
+				public void onBookEvent(BookEvent event, Book book) {
+					switch (event) {
+						case Added:
+							System.err.println("Added " + book.getTitle());
+							break;
+					}
+				}
+
+				public void onBuildEvent(BuildEvent event) {
+					switch (event) {
+						case Started:
+							System.err.println("Build started");
+							break;
+						case Succeeded:
+							System.err.println("Build succeeded");
+							break;
+						case Failed:
+							System.err.println("Build failed");
+							break;
+						case Completed:
+							System.err.println("Build completed with " + myCollection.size() + " books in " + (System.currentTimeMillis() - start) + " milliseconds");
+							break;
+					}
+				}
+			});
+			myCollection.startBuild();
 		}
 
-		public boolean isUpToDate() {
-			return myBaseLibrary.isUpToDate();
+		public int size() {
+			return myCollection.size();
+		}
+
+		public String recentBook(int index) {
+			return SerializerUtil.serialize(myCollection.getRecentBook(index));
+		}
+
+		public String bookById(long id) {
+			return SerializerUtil.serialize(myCollection.getBookById(id));
+		}
+
+		public List<String> allBookmarks() {
+			return SerializerUtil.serialize(myCollection.allBookmarks());
+		}
+
+		public String saveBookmark(String serialized) {
+			final Bookmark bookmark = SerializerUtil.deserializeBookmark(serialized);
+			myCollection.saveBookmark(bookmark);
+			return SerializerUtil.serialize(bookmark);
+		}
+
+		public void deleteBookmark(String serialized) {
+			myCollection.deleteBookmark(SerializerUtil.deserializeBookmark(serialized));
 		}
 	}
 
@@ -70,19 +121,12 @@ public class LibraryService extends Service implements Library.ChangeListener {
 		System.err.println("LibraryService.onCreate()");
 		super.onCreate();
 		myLibrary = new LibraryImplementation();
-		myLibrary.myBaseLibrary.addChangeListener(this);
 	}
 
 	@Override
 	public void onDestroy() {
 		System.err.println("LibraryService.onDestroy()");
-		myLibrary.myBaseLibrary.removeChangeListener(this);
 		myLibrary = null;
 		super.onDestroy();
-	}
-
-	public void onLibraryChanged(final Code code) {
-		// TODO: implement signal sending
-		System.err.println("LibraryService.onLibraryChanged(" + code + "): " + myLibrary.isUpToDate());
 	}
 }

@@ -4,6 +4,14 @@
 
 package org.geometerplus.android.fbreader.libraryService;
 
+import java.util.List;
+
 interface LibraryInterface {
-	boolean isUpToDate();
+	int size();
+	String bookById(in long id);
+	String recentBook(in int index);
+
+	List<String> allBookmarks();
+	String saveBookmark(in String bookmark);
+	void deleteBookmark(in String bookmark);
 }

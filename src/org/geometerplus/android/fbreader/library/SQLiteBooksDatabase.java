@@ -496,10 +496,10 @@ public final class SQLiteBooksDatabase extends BooksDatabase {
 		} else {
 			long seriesId;
 			try {
-				myGetSeriesIdStatement.bindString(1, seriesInfo.Name);
+				myGetSeriesIdStatement.bindString(1, seriesInfo.Title);
 				seriesId = myGetSeriesIdStatement.simpleQueryForLong();
 			} catch (SQLException e) {
-				myInsertSeriesStatement.bindString(1, seriesInfo.Name);
+				myInsertSeriesStatement.bindString(1, seriesInfo.Title);
 				seriesId = myInsertSeriesStatement.executeInsert();
 			}
 			myInsertBookSeriesStatement.bindLong(1, bookId);
@@ -516,7 +516,7 @@ public final class SQLiteBooksDatabase extends BooksDatabase {
 		final Cursor cursor = myDatabase.rawQuery("SELECT Series.name,BookSeries.book_index FROM BookSeries INNER JOIN Series ON Series.series_id = BookSeries.series_id WHERE BookSeries.book_id = ?", new String[] { "" + bookId });
 		SeriesInfo info = null;
 		if (cursor.moveToNext()) {
-			info = new SeriesInfo(cursor.getString(0), SeriesInfo.createIndex(cursor.getString(1)));
+			info = SeriesInfo.createSeriesInfo(cursor.getString(0), cursor.getString(1));
 		}
 		cursor.close();
 		return info;
@@ -799,9 +799,9 @@ public final class SQLiteBooksDatabase extends BooksDatabase {
 
 		statement.bindLong(1, bookmark.getBookId());
 		statement.bindString(2, bookmark.getText());
-		SQLiteUtil.bindDate(statement, 3, bookmark.getTime(Bookmark.CREATION));
-		SQLiteUtil.bindDate(statement, 4, bookmark.getTime(Bookmark.MODIFICATION));
-		SQLiteUtil.bindDate(statement, 5, bookmark.getTime(Bookmark.ACCESS));
+		SQLiteUtil.bindDate(statement, 3, bookmark.getDate(Bookmark.DateType.Creation));
+		SQLiteUtil.bindDate(statement, 4, bookmark.getDate(Bookmark.DateType.Modification));
+		SQLiteUtil.bindDate(statement, 5, bookmark.getDate(Bookmark.DateType.Access));
 		statement.bindLong(6, bookmark.getAccessCount());
 		SQLiteUtil.bindString(statement, 7, bookmark.ModelId);
 		statement.bindLong(8, bookmark.ParagraphIndex);

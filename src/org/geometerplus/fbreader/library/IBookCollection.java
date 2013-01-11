@@ -17,24 +17,16 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.android.fbreader;
+package org.geometerplus.fbreader.library;
 
-import android.content.Intent;
+import java.util.List;
 
-import org.geometerplus.fbreader.fbreader.FBReaderApp;
+public interface IBookCollection {
+	int size();
+	Book getBookById(long id);
+	Book getRecentBook(int index);
 
-abstract class RunActivityAction extends FBAndroidAction {
-	private final Class<?> myActivityClass;
-
-	RunActivityAction(FBReader baseActivity, FBReaderApp fbreader, Class<?> activityClass) {
-		super(baseActivity, fbreader);
-		myActivityClass = activityClass;
-	}
-
-	@Override
-	protected void run(Object ... params) {
-		OrientationUtil.startActivity(
-			BaseActivity, new Intent(BaseActivity.getApplicationContext(), myActivityClass)
-		);
-	}
+	List<Bookmark> allBookmarks();
+	void saveBookmark(Bookmark bookmark);
+	void deleteBookmark(Bookmark bookmark);
 }
