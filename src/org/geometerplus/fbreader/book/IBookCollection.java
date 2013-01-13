@@ -23,6 +23,8 @@ import java.util.List;
 
 import org.geometerplus.zlibrary.core.filesystem.ZLFile;
 
+import org.geometerplus.zlibrary.text.view.ZLTextPosition;
+
 public interface IBookCollection {
 	public interface Listener {
 		public enum BookEvent {
@@ -54,9 +56,16 @@ public interface IBookCollection {
 	Book getBookById(long id);
 	Book getRecentBook(int index);
 
+	boolean saveBook(Book book, boolean force);
 	void removeBook(Book book, boolean deleteFromDisk);
 	void addBookToRecentList(Book book);
 	void setBookFavorite(Book book, boolean favorite);
+
+	ZLTextPosition getStoredPosition(long bookId);
+	void storePosition(long bookId, ZLTextPosition position);
+
+	boolean isHyperlinkVisited(Book book, String linkId);
+	void markHyperlinkAsVisited(Book book, String linkId);
 
 	List<Bookmark> allBookmarks();
 	List<Bookmark> invisibleBookmarks(Book book);

@@ -121,8 +121,7 @@ public class Book {
 		}
 	}
 
-	void loadLists() {
-		final BooksDatabase database = BooksDatabase.Instance();
+	void loadLists(BooksDatabase database) {
 		myAuthors = database.loadAuthors(myId);
 		myTags = database.loadTags(myId);
 		mySeriesInfo = database.loadSeriesInfo(myId);
@@ -328,23 +327,23 @@ public class Book {
 		return false;
 	}
 
-	public boolean save() {
-		return save(false);
-	}
-
-	public boolean save(boolean force) {
+	boolean save(final BooksDatabase database, boolean force) {
 		if (!force && myIsSaved) {
 			return false;
 		}
-		final BooksDatabase database = BooksDatabase.Instance();
+
 		database.executeAsATransaction(new Runnable() {
 			public void run() {
 				if (myId >= 0) {
-					final FileInfoSet fileInfos = new FileInfoSet(File);
+					final FileInfoSet fileInfos = new FileInfoSet(database, File);
 					database.updateBookInfo(myId, fileInfos.getId(File), myEncoding, myLanguage, myTitle);
 				} else {
 					myId = database.insertBookInfo(File, myEncoding, myLanguage, myTitle);
-					storeAllVisitedHyperinks();
+					if (myId != -1 && myVisitedHyperlinks != null) {
+						for (String linkId : myVisitedHyperlinks) {
+							database.addVisitedHyperlink(myId, linkId);
+						}
+					}
 				}
 
 				long index = 0;
@@ -364,45 +363,27 @@ public class Book {
 		return true;
 	}
 
-	public ZLTextPosition getStoredPosition() {
-		return BooksDatabase.Instance().getStoredPosition(myId);
-	}
-
-	public void storePosition(ZLTextPosition position) {
-		if (myId != -1) {
-			BooksDatabase.Instance().storePosition(myId, position);
-		}
-	}
-
 	private Set<String> myVisitedHyperlinks;
-	private void initHyperlinkSet() {
+	private void initHyperlinkSet(BooksDatabase database) {
 		if (myVisitedHyperlinks == null) {
 			myVisitedHyperlinks = new TreeSet<String>();
 			if (myId != -1) {
-				myVisitedHyperlinks.addAll(BooksDatabase.Instance().loadVisitedHyperlinks(myId));
+				myVisitedHyperlinks.addAll(database.loadVisitedHyperlinks(myId));
 			}
 		}
 	}
 
-	public boolean isHyperlinkVisited(String linkId) {
-		initHyperlinkSet();
+	boolean isHyperlinkVisited(BooksDatabase database, String linkId) {
+		initHyperlinkSet(database);
 		return myVisitedHyperlinks.contains(linkId);
 	}
 
-	public void markHyperlinkAsVisited(String linkId) {
-		initHyperlinkSet();
+	void markHyperlinkAsVisited(BooksDatabase database, String linkId) {
+		initHyperlinkSet(database);
 		if (!myVisitedHyperlinks.contains(linkId)) {
 			myVisitedHyperlinks.add(linkId);
 			if (myId != -1) {
-				BooksDatabase.Instance().addVisitedHyperlink(myId, linkId);
-			}
-		}
-	}
-
-	private void storeAllVisitedHyperinks() {
-		if (myId != -1 && myVisitedHyperlinks != null) {
-			for (String linkId : myVisitedHyperlinks) {
-				BooksDatabase.Instance().addVisitedHyperlink(myId, linkId);
+				database.addVisitedHyperlink(myId, linkId);
 			}
 		}
 	}

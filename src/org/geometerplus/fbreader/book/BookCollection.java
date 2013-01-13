@@ -24,6 +24,8 @@ import java.util.*;
 
 import org.geometerplus.zlibrary.core.filesystem.*;
 
+import org.geometerplus.zlibrary.text.view.ZLTextPosition;
+
 import org.geometerplus.fbreader.Paths;
 import org.geometerplus.fbreader.bookmodel.BookReadingException;
 
@@ -87,11 +89,11 @@ public class BookCollection implements IBookCollection {
 			return null;
 		}
 
-		final FileInfoSet fileInfos = new FileInfoSet(bookFile);
+		final FileInfoSet fileInfos = new FileInfoSet(myDatabase, bookFile);
 
-		book = BooksDatabase.Instance().loadBookByFile(fileInfos.getId(bookFile), bookFile);
+		book = myDatabase.loadBookByFile(fileInfos.getId(bookFile), bookFile);
 		if (book != null) {
-			book.loadLists();
+			book.loadLists(myDatabase);
 		}
 
 		if (book != null && fileInfos.check(physicalFile, physicalFile != bookFile)) {
@@ -110,7 +112,7 @@ public class BookCollection implements IBookCollection {
 			return null;
 		}
 
-		book.save();
+		saveBook(book, false);
 		addBook(book);
 		return book;
 	}
@@ -121,11 +123,11 @@ public class BookCollection implements IBookCollection {
 			return book;
 		}
 
-		book = BooksDatabase.Instance().loadBook(id);
+		book = myDatabase.loadBook(id);
 		if (book == null) {
 			return null;
 		}
-		book.loadLists();
+		book.loadLists(myDatabase);
 
 		final ZLFile bookFile = book.File;
 		final ZLPhysicalFile physicalFile = bookFile.getPhysicalFile();
@@ -137,7 +139,7 @@ public class BookCollection implements IBookCollection {
 			return null;
 		}
 
-		FileInfoSet fileInfos = new FileInfoSet(physicalFile);
+		FileInfoSet fileInfos = new FileInfoSet(myDatabase, physicalFile);
 		if (fileInfos.check(physicalFile, physicalFile != bookFile)) {
 			addBook(book);
 			return book;
@@ -169,6 +171,10 @@ public class BookCollection implements IBookCollection {
 		if (id != -1) {
 			myBooksById.put(id, book);
 		}
+	}
+
+	public boolean saveBook(Book book, boolean force) {
+		return book.save(myDatabase, force);
 	}
 
 	public void removeBook(Book book, boolean deleteFromDisk) {
@@ -277,7 +283,7 @@ public class BookCollection implements IBookCollection {
 
 	private void build() {
 		// Step 0: get database books marked as "existing"
-		final FileInfoSet fileInfos = new FileInfoSet();
+		final FileInfoSet fileInfos = new FileInfoSet(myDatabase);
 		final Map<Long,Book> savedBooksByFileId = myDatabase.loadBooks(fileInfos, true);
 		final Map<Long,Book> savedBooksByBookId = new HashMap<Long,Book>();
 		for (Book b : savedBooksByFileId.values()) {
@@ -320,7 +326,7 @@ public class BookCollection implements IBookCollection {
 					if (!fileInfos.check(file, true)) {
 						try {
 							book.readMetaInfo();
-							book.save();
+							saveBook(book, false);
 						} catch (BookReadingException e) {
 							doAdd = false;
 						}
@@ -374,7 +380,7 @@ public class BookCollection implements IBookCollection {
 		myDatabase.executeAsATransaction(new Runnable() {
 			public void run() {
 				for (Book book : newBooks) {
-					book.save();
+					saveBook(book, false);
 					addBookById(book);
 				}
 			}
@@ -469,13 +475,13 @@ public class BookCollection implements IBookCollection {
 
 	public void saveBookmark(Bookmark bookmark) {
 		if (bookmark != null) {
-			bookmark.setId(BooksDatabase.Instance().saveBookmark(bookmark));
+			bookmark.setId(myDatabase.saveBookmark(bookmark));
 		}
 	}
 
 	public void deleteBookmark(Bookmark bookmark) {
 		if (bookmark != null && bookmark.getId() != -1) {
-			BooksDatabase.Instance().deleteBookmark(bookmark);
+			myDatabase.deleteBookmark(bookmark);
 		}
 	}
 
@@ -497,5 +503,23 @@ public class BookCollection implements IBookCollection {
 		}
 
 		return ZLResourceFile.createResourceFile("data/help/MiniHelp.en.fb2");
+	}
+
+	public ZLTextPosition getStoredPosition(long bookId) {
+		return myDatabase.getStoredPosition(bookId);
+	}
+
+	public void storePosition(long bookId, ZLTextPosition position) {
+		if (bookId != -1) {
+			myDatabase.storePosition(bookId, position);
+		}
+	}
+
+	public boolean isHyperlinkVisited(Book book, String linkId) {
+		return book.isHyperlinkVisited(myDatabase, linkId);
+	}
+
+	public void markHyperlinkAsVisited(Book book, String linkId) {
+		book.markHyperlinkAsVisited(myDatabase, linkId);
 	}
 }
