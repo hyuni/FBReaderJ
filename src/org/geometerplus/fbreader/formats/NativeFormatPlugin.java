@@ -25,9 +25,9 @@ import org.geometerplus.zlibrary.core.encodings.JavaEncodingCollection;
 import org.geometerplus.zlibrary.core.image.*;
 import org.geometerplus.zlibrary.core.util.MimeType;
 
+import org.geometerplus.fbreader.book.Book;
 import org.geometerplus.fbreader.bookmodel.BookModel;
 import org.geometerplus.fbreader.bookmodel.BookReadingException;
-import org.geometerplus.fbreader.library.Book;
 import org.geometerplus.fbreader.formats.fb2.FB2NativePlugin;
 import org.geometerplus.fbreader.formats.oeb.OEBNativePlugin;
 
@@ -58,6 +58,7 @@ public class NativeFormatPlugin extends FormatPlugin {
 	@Override
 	public void detectLanguageAndEncoding(Book book) {
 		detectLanguageAndEncodingNative(book);
+		book.save(false);
 	}
 
 	public native void detectLanguageAndEncodingNative(Book book);

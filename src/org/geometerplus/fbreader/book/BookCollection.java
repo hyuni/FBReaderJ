@@ -17,38 +17,18 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.fbreader.library;
+package org.geometerplus.fbreader.book;
 
 import java.io.File;
 import java.util.*;
 
-import org.geometerplus.zlibrary.core.filesystem.ZLFile;
-import org.geometerplus.zlibrary.core.filesystem.ZLPhysicalFile;
+import org.geometerplus.zlibrary.core.filesystem.*;
 
 import org.geometerplus.fbreader.Paths;
 import org.geometerplus.fbreader.bookmodel.BookReadingException;
 
 public class BookCollection implements IBookCollection {
 	private final List<Listener> myListeners = Collections.synchronizedList(new LinkedList<Listener>());
-
-	public interface Listener {
-		public enum BookEvent {
-			Added,
-			Updated,
-			Removed
-		}
-
-		public enum BuildEvent {
-			Started,
-			NotStarted,
-			Succeeded,
-			Failed,
-			Completed
-		}
-
-		void onBookEvent(BookEvent event, Book book);
-		void onBuildEvent(BuildEvent event);
-	}
 
 	public void addListener(Listener listener) {
 		myListeners.add(listener);
@@ -77,7 +57,12 @@ public class BookCollection implements IBookCollection {
 		Collections.synchronizedMap(new LinkedHashMap<ZLFile,Book>());
 	private final Map<Long,Book> myBooksById =
 		Collections.synchronizedMap(new HashMap<Long,Book>());
-	private volatile boolean myBuildStarted = false;
+	private static enum BuildStatus {
+		NotStarted,
+		Started,
+		Finished
+	};
+	private volatile BuildStatus myBuildStatus = BuildStatus.NotStarted;
 
 	public BookCollection(BooksDatabase db) {
 		myDatabase = db;
@@ -85,6 +70,49 @@ public class BookCollection implements IBookCollection {
 
 	public int size() {
 		return myBooksByFile.size();
+	}
+
+	public Book getBookByFile(ZLFile bookFile) {
+		if (bookFile == null) {
+			return null;
+		}
+
+		Book book = myBooksByFile.get(bookFile);
+		if (book != null) {
+			return book;
+		}
+
+		final ZLPhysicalFile physicalFile = bookFile.getPhysicalFile();
+		if (physicalFile != null && !physicalFile.exists()) {
+			return null;
+		}
+
+		final FileInfoSet fileInfos = new FileInfoSet(bookFile);
+
+		book = BooksDatabase.Instance().loadBookByFile(fileInfos.getId(bookFile), bookFile);
+		if (book != null) {
+			book.loadLists();
+		}
+
+		if (book != null && fileInfos.check(physicalFile, physicalFile != bookFile)) {
+			addBook(book);
+			return book;
+		}
+		fileInfos.save();
+
+		try {
+			if (book == null) {
+				book = new Book(bookFile);
+			} else {
+				book.readMetaInfo();
+			}
+		} catch (BookReadingException e) {
+			return null;
+		}
+
+		book.save();
+		addBook(book);
+		return book;
 	}
 
 	public Book getBookById(long id) {
@@ -165,6 +193,20 @@ public class BookCollection implements IBookCollection {
 		}
 	}
 
+	public List<Book> books(String pattern) {
+		if (pattern == null || pattern.length() == 0) {
+			return Collections.emptyList();
+		}
+
+		final LinkedList<Book> filtered = new LinkedList<Book>();
+		for (Book b : books()) {
+			if (b.matches(pattern)) {
+				filtered.add(b);
+			}
+		}
+		return filtered;
+	}
+
 	public List<Book> recentBooks() {
 		return books(myDatabase.loadRecentBookIds());
 	}
@@ -210,11 +252,11 @@ public class BookCollection implements IBookCollection {
 	}
 
 	public synchronized void startBuild() {
-		if (myBuildStarted) {
+		if (myBuildStatus != BuildStatus.NotStarted) {
 			fireBuildEvent(Listener.BuildEvent.NotStarted);
 			return;
 		}
-		myBuildStarted = true;
+		myBuildStatus = BuildStatus.Started;
 
 		final Thread builder = new Thread("Library.build") {
 			public void run() {
@@ -226,7 +268,7 @@ public class BookCollection implements IBookCollection {
 					fireBuildEvent(Listener.BuildEvent.Failed);
 				} finally {
 					fireBuildEvent(Listener.BuildEvent.Completed);
-					myBuildStarted = false;
+					myBuildStatus = BuildStatus.Finished;
 				}
 			}
 		};
@@ -290,8 +332,6 @@ public class BookCollection implements IBookCollection {
 						addBook(book);
 					}
 				} else {
-					//myRootTree.removeBook(book, true);
-					//fireBookEvent(Listener.BookEvent.Removed);
 					orphanedBooks.add(book);
 				}
 			}
@@ -319,7 +359,7 @@ public class BookCollection implements IBookCollection {
 		
 		// Step 4: add help file
 		try {
-			final ZLFile helpFile = Library.getHelpFile();
+			final ZLFile helpFile = getHelpFile();
 			Book helpBook = savedBooksByFileId.get(fileInfos.getId(helpFile));
 			if (helpBook == null) {
 				helpBook = new Book(helpFile);
@@ -344,12 +384,18 @@ public class BookCollection implements IBookCollection {
 		myDatabase.setExistingFlag(newBooks, true);
 	}
 
+	public List<String> bookDirectories() {
+		return Collections.singletonList(Paths.BooksDirectoryOption().getValue());
+	}
+
 	private List<ZLPhysicalFile> collectPhysicalFiles() {
 		final Queue<ZLFile> dirQueue = new LinkedList<ZLFile>();
 		final HashSet<ZLFile> dirSet = new HashSet<ZLFile>();
 		final LinkedList<ZLPhysicalFile> fileList = new LinkedList<ZLPhysicalFile>();
 
-		dirQueue.offer(new ZLPhysicalFile(new File(Paths.BooksDirectoryOption().getValue())));
+		for (String path : bookDirectories()) {
+			dirQueue.offer(new ZLPhysicalFile(new File(path)));
+		}
 
 		while (!dirQueue.isEmpty()) {
 			for (ZLFile file : dirQueue.poll().children()) {
@@ -433,5 +479,25 @@ public class BookCollection implements IBookCollection {
 		if (bookmark != null && bookmark.getId() != -1) {
 			BooksDatabase.Instance().deleteBookmark(bookmark);
 		}
+	}
+
+	public static ZLResourceFile getHelpFile() {
+		final Locale locale = Locale.getDefault();
+
+		ZLResourceFile file = ZLResourceFile.createResourceFile(
+			"data/help/MiniHelp." + locale.getLanguage() + "_" + locale.getCountry() + ".fb2"
+		);
+		if (file.exists()) {
+			return file;
+		}
+
+		file = ZLResourceFile.createResourceFile(
+			"data/help/MiniHelp." + locale.getLanguage() + ".fb2"
+		);
+		if (file.exists()) {
+			return file;
+		}
+
+		return ZLResourceFile.createResourceFile("data/help/MiniHelp.en.fb2");
 	}
 }

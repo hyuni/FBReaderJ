@@ -35,6 +35,7 @@ import org.geometerplus.zlibrary.ui.android.application.ZLAndroidApplicationWind
 
 public abstract class ZLAndroidActivity extends Activity {
 	protected abstract ZLApplication createApplication();
+	protected abstract void init(Runnable action);
 
 	private static final String REQUESTED_ORIENTATION_KEY = "org.geometerplus.zlibrary.ui.android.library.androidActiviy.RequestedOrientation";
 	private static final String ORIENTATION_CHANGE_COUNTER_KEY = "org.geometerplus.zlibrary.ui.android.library.androidActiviy.ChangeCounter";
@@ -96,14 +97,18 @@ public abstract class ZLAndroidActivity extends Activity {
 			application.initWindow();
 		}
 
-		new Thread() {
+		init(new Runnable() {
 			public void run() {
-				ZLApplication.Instance().openFile(fileFromIntent(getIntent()), getPostponedInitAction());
+				new Thread() {
+					public void run() {
+						ZLApplication.Instance().openFile(fileFromIntent(getIntent()), getPostponedInitAction());
+						ZLApplication.Instance().getViewWidget().repaint();
+					}
+				}.start();
+
 				ZLApplication.Instance().getViewWidget().repaint();
 			}
-		}.start();
-
-		ZLApplication.Instance().getViewWidget().repaint();
+		});
 	}
 
 	protected abstract Runnable getPostponedInitAction();
@@ -188,11 +193,15 @@ public abstract class ZLAndroidActivity extends Activity {
 	}
 
 	@Override
-	protected void onNewIntent(Intent intent) {
+	protected void onNewIntent(final Intent intent) {
 		super.onNewIntent(intent);
 		final String action = intent.getAction();
 		if (Intent.ACTION_VIEW.equals(action) || "android.fbreader.action.VIEW".equals(action)) {
-			ZLApplication.Instance().openFile(fileFromIntent(intent), null);
+			init(new Runnable() {
+				public void run() {
+					ZLApplication.Instance().openFile(fileFromIntent(intent), null);
+				}
+			});
 		}
 	}
 

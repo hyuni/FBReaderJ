@@ -23,7 +23,7 @@ import java.util.List;
 
 import org.geometerplus.zlibrary.text.model.*;
 
-import org.geometerplus.fbreader.library.Book;
+import org.geometerplus.fbreader.book.Book;
 import org.geometerplus.fbreader.formats.FormatPlugin;
 
 public abstract class BookModel {
@@ -48,7 +48,7 @@ public abstract class BookModel {
 		return model;
 	}
 
-	public final Book Book;
+	public Book Book;
 	public final TOCTree TOCTree = new TOCTree();
 
 	public static final class Label {

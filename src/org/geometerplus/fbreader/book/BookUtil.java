@@ -17,12 +17,24 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.fbreader.library;
+package org.geometerplus.fbreader.book;
 
-abstract class AbstractSerializer {
-	public abstract String serialize(Book book);
-	public abstract Book deserializeBook(String xml);
+import org.geometerplus.zlibrary.core.filesystem.ZLFile;
+import org.geometerplus.zlibrary.core.image.ZLImage;
 
-	public abstract String serialize(Bookmark bookmark);
-	public abstract Bookmark deserializeBookmark(String xml);
+import org.geometerplus.fbreader.formats.FormatPlugin;
+import org.geometerplus.fbreader.bookmodel.BookReadingException;
+
+public abstract class BookUtil {
+	public static ZLImage getCover(Book book) {
+		return book != null ? book.getCover() : null;
+	}
+
+	public static String getAnnotation(Book book) {
+		try {
+			return book.getPlugin().readAnnotation(book.File);
+		} catch (BookReadingException e) {
+			return null;
+		}
+	}
 }

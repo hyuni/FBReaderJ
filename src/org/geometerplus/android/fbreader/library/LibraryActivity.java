@@ -20,6 +20,7 @@
 package org.geometerplus.android.fbreader.library;
 
 import android.app.AlertDialog;
+import android.app.SearchManager;
 import android.content.*;
 import android.os.Bundle;
 import android.view.*;
@@ -34,6 +35,7 @@ import org.geometerplus.zlibrary.core.util.MimeType;
 
 import org.geometerplus.zlibrary.ui.android.R;
 
+import org.geometerplus.fbreader.book.*;
 import org.geometerplus.fbreader.library.*;
 import org.geometerplus.fbreader.tree.FBTree;
 
@@ -44,9 +46,9 @@ import org.geometerplus.android.fbreader.tree.TreeActivity;
 public class LibraryActivity extends TreeActivity implements MenuItem.OnMenuItemClickListener, View.OnCreateContextMenuListener, Library.ChangeListener {
 	static volatile boolean ourToBeKilled = false;
 
-	public static final String SELECTED_BOOK_PATH_KEY = "SelectedBookPath";
+	public static final String SELECTED_BOOK_KEY = "fbreader.library.selected-book";
+	static final String START_SEARCH_ACTION = "action.fbreader.library.start-search";
 
-	private BooksDatabase myDatabase;
 	private Library myLibrary;
 
 	private Book mySelectedBook;
@@ -55,24 +57,19 @@ public class LibraryActivity extends TreeActivity implements MenuItem.OnMenuItem
 	public void onCreate(Bundle icicle) {
 		super.onCreate(icicle);
 
-		myDatabase = SQLiteBooksDatabase.Instance();
-		if (myDatabase == null) {
-			myDatabase = new SQLiteBooksDatabase(this, "LIBRARY");
-		}
 		if (myLibrary == null) {
-			myLibrary = Library.Instance();
+			BooksDatabase db = SQLiteBooksDatabase.Instance();
+			if (db == null) {
+				db = new SQLiteBooksDatabase(this, "LIBRARY");
+			}
+			final BookCollection collection = new BookCollection(db);
+			myLibrary = new Library(collection);
 			myLibrary.addChangeListener(this);
-			myLibrary.startBuild();
+			collection.startBuild();
 		}
 
-		final String selectedBookPath = getIntent().getStringExtra(SELECTED_BOOK_PATH_KEY);
-		mySelectedBook = null;
-		if (selectedBookPath != null) {
-			final ZLFile file = ZLFile.createFileByPath(selectedBookPath);
-			if (file != null) {
-				mySelectedBook = Book.getByFile(file);
-			}
-		}
+		mySelectedBook =
+			SerializerUtil.deserializeBook(getIntent().getStringExtra(SELECTED_BOOK_KEY));
 
 		new LibraryTreeAdapter(this);
 
@@ -80,6 +77,19 @@ public class LibraryActivity extends TreeActivity implements MenuItem.OnMenuItem
 
 		getListView().setTextFilterEnabled(true);
 		getListView().setOnCreateContextMenuListener(this);
+	}
+
+	@Override
+	protected void onNewIntent(Intent intent) {
+		if (START_SEARCH_ACTION.equals(intent.getAction())) {
+			final String pattern = intent.getStringExtra(SearchManager.QUERY);
+			if (pattern != null && pattern.length() > 0) {
+				BookSearchPatternOption.setValue(pattern);
+				myLibrary.startBookSearch(pattern);
+			}
+		} else {
+			super.onNewIntent(intent);
+		}
 	}
 
 	@Override
@@ -132,16 +142,15 @@ public class LibraryActivity extends TreeActivity implements MenuItem.OnMenuItem
 		OrientationUtil.startActivityForResult(
 			this,
 			new Intent(getApplicationContext(), BookInfoActivity.class)
-				.putExtra(BookInfoActivity.CURRENT_BOOK_PATH_KEY, book.File.getPath()),
+				.putExtra(BookInfoActivity.CURRENT_BOOK_KEY, SerializerUtil.serialize(book)),
 			BOOK_INFO_REQUEST
 		);
 	}
 
 	@Override
 	protected void onActivityResult(int requestCode, int returnCode, Intent intent) {
-		if (requestCode == BOOK_INFO_REQUEST && intent != null) {
-			final String path = intent.getStringExtra(BookInfoActivity.CURRENT_BOOK_PATH_KEY);
-			final Book book = Book.getByFile(ZLFile.createFileByPath(path));
+		if (requestCode == BOOK_INFO_REQUEST) {
+			final Book book = BookInfoActivity.bookByIntent(intent);
 			myLibrary.refreshBookInfo(book);
 			getListView().invalidateViews();
 		} else {
@@ -152,7 +161,7 @@ public class LibraryActivity extends TreeActivity implements MenuItem.OnMenuItem
 	//
 	// Search
 	//
-	static final ZLStringOption BookSearchPatternOption =
+	private final ZLStringOption BookSearchPatternOption =
 		new ZLStringOption("BookSearch", "Pattern", "");
 
 	private void openSearchResults() {
@@ -188,7 +197,7 @@ public class LibraryActivity extends TreeActivity implements MenuItem.OnMenuItem
 	}
 
 	private void createBookContextMenu(ContextMenu menu, Book book) {
-		final ZLResource resource = LibraryUtil.resource();
+		final ZLResource resource = Library.resource();
 		menu.setHeaderTitle(book.getTitle());
 		menu.add(0, OPEN_BOOK_ITEM_ID, 0, resource.getResource("openBook").getValue());
 		menu.add(0, SHOW_BOOK_INFO_ITEM_ID, 0, resource.getResource("showBookInfo").getValue());
@@ -261,7 +270,7 @@ public class LibraryActivity extends TreeActivity implements MenuItem.OnMenuItem
 	}
 
 	private MenuItem addMenuItem(Menu menu, int index, String resourceKey) {
-		final String label = LibraryUtil.resource().getResource("menu").getResource(resourceKey).getValue();
+		final String label = Library.resource().getResource("menu").getResource(resourceKey).getValue();
 		final MenuItem item = menu.add(0, index, Menu.NONE, label);
 		item.setOnMenuItemClickListener(this);
 		item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);

@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.fbreader.library;
+package org.geometerplus.fbreader.book;
 
 import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
@@ -33,48 +33,13 @@ import org.geometerplus.zlibrary.core.image.ZLImage;
 
 import org.geometerplus.zlibrary.text.view.ZLTextPosition;
 
-import org.geometerplus.fbreader.formats.*;
 import org.geometerplus.fbreader.bookmodel.BookReadingException;
+import org.geometerplus.fbreader.formats.*;
+import org.geometerplus.fbreader.library.Library;
 
 import org.geometerplus.fbreader.Paths;
 
 public class Book {
-	public static Book getByFile(ZLFile bookFile) {
-		if (bookFile == null) {
-			return null;
-		}
-
-		final ZLPhysicalFile physicalFile = bookFile.getPhysicalFile();
-		if (physicalFile != null && !physicalFile.exists()) {
-			return null;
-		}
-
-		final FileInfoSet fileInfos = new FileInfoSet(bookFile);
-
-		Book book = BooksDatabase.Instance().loadBookByFile(fileInfos.getId(bookFile), bookFile);
-		if (book != null) {
-			book.loadLists();
-		}
-
-		if (book != null && fileInfos.check(physicalFile, physicalFile != bookFile)) {
-			return book;
-		}
-		fileInfos.save();
-
-		try {
-			if (book == null) {
-				book = new Book(bookFile);
-			} else {
-				book.readMetaInfo();
-			}
-		} catch (BookReadingException e) {
-			return null;
-		}
-
-		book.save();
-		return book;
-	}
-
 	public final ZLFile File;
 
 	private volatile long myId;
@@ -110,19 +75,9 @@ public class Book {
 	public void reloadInfoFromFile() {
 		try {
 			readMetaInfo();
-			save();
 		} catch (BookReadingException e) {
 			// ignore
 		}
-	}
-
-	public void reloadInfoFromDatabase() {
-		final BooksDatabase database = BooksDatabase.Instance();
-		database.reloadBook(this);
-		myAuthors = database.loadAuthors(myId);
-		myTags = database.loadTags(myId);
-		mySeriesInfo = database.loadSeriesInfo(myId);
-		myIsSaved = true;
 	}
 
 	private FormatPlugin getPlugin(ZLFile file) throws BookReadingException {
@@ -160,7 +115,7 @@ public class Book {
 		}
 		final String demoPathPrefix = Paths.mainBookDirectory() + "/Demos/";
 		if (File.getPath().startsWith(demoPathPrefix)) {
-			final String demoTag = LibraryUtil.resource().getResource("demo").getValue();
+			final String demoTag = Library.resource().getResource("demo").getValue();
 			setTitle(getTitle() + " (" + demoTag + ")");
 			addTag(demoTag);
 		}
@@ -291,9 +246,7 @@ public class Book {
 	public String getEncoding() {
 		if (myEncoding == null) {
 			try {
-				System.err.println("detect encoding for " + getId());
 				getPlugin().detectLanguageAndEncoding(this);
-				System.err.println("detected encoding for " + getId() + " = " + myEncoding);
 			} catch (BookReadingException e) {
 			}
 			if (myEncoding == null) {
@@ -348,7 +301,7 @@ public class Book {
 		addTag(Tag.getTag(null, tagName));
 	}
 
-	boolean matches(String pattern) {
+	public boolean matches(String pattern) {
 		if (myTitle != null && ZLMiscUtil.matchesIgnoreCase(myTitle, pattern)) {
 			return true;
 		}
@@ -376,7 +329,11 @@ public class Book {
 	}
 
 	public boolean save() {
-		if (myIsSaved) {
+		return save(false);
+	}
+
+	public boolean save(boolean force) {
+		if (!force && myIsSaved) {
 			return false;
 		}
 		final BooksDatabase database = BooksDatabase.Instance();

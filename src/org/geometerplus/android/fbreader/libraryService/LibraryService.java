@@ -20,18 +20,60 @@
 package org.geometerplus.android.fbreader.libraryService;
 
 import java.util.List;
+import java.util.LinkedList;
 
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.os.FileObserver;
 
-import org.geometerplus.fbreader.library.*;
+import org.geometerplus.zlibrary.core.filesystem.ZLFile;
+
+import org.geometerplus.fbreader.book.*;
 
 import org.geometerplus.android.fbreader.library.SQLiteBooksDatabase;
 
 public class LibraryService extends Service {
+	private static final class Observer extends FileObserver {
+		private static final int MASK =
+			MOVE_SELF | MOVED_TO | MOVED_FROM | DELETE_SELF | DELETE | CLOSE_WRITE | ATTRIB;
+
+		public Observer(String path) {
+			super(path, MASK);
+		}
+
+		@Override
+		public void onEvent(int event, String path) {
+			event = event & ALL_EVENTS;
+			System.err.println("Event " + event + " on " + path);
+			switch (event) {
+				case MOVE_SELF:
+					// TODO: File(path) removed; stop watching (?)
+					break;
+				case MOVED_TO:
+					// TODO: File(path) removed; File(path) added
+					break;
+				case MOVED_FROM:
+				case DELETE:
+					// TODO: File(path) removed
+					break;
+				case DELETE_SELF:
+					// TODO: File(path) removed; watching is stopped automatically (?)
+					break;
+				case CLOSE_WRITE:
+				case ATTRIB:
+					// TODO: File(path) changed (added, removed?)
+					break;
+				default:
+					System.err.println("Unexpected event " + event + " on " + path);
+					break;
+			}
+		}
+	}
+
 	public final class LibraryImplementation extends LibraryInterface.Stub {
 		private final BookCollection myCollection;
+		private final List<FileObserver> myFileObservers = new LinkedList<FileObserver>();
 
 		LibraryImplementation() {
 			BooksDatabase database = SQLiteBooksDatabase.Instance();
@@ -39,6 +81,12 @@ public class LibraryService extends Service {
 				database = new SQLiteBooksDatabase(LibraryService.this, "LIBRARY SERVICE");
 			}
 			myCollection = new BookCollection(database);
+			for (String path : myCollection.bookDirectories()) {
+				final Observer observer = new Observer(path);
+				observer.startWatching();
+				myFileObservers.add(observer);
+			}
+
 			final long start = System.currentTimeMillis();
 			myCollection.addListener(new BookCollection.Listener() {
 				public void onBookEvent(BookEvent event, Book book) {
@@ -69,20 +117,60 @@ public class LibraryService extends Service {
 			myCollection.startBuild();
 		}
 
+		public void deactivate() {
+			for (FileObserver observer : myFileObservers) {
+				observer.stopWatching();
+			}
+		}
+
 		public int size() {
 			return myCollection.size();
 		}
 
-		public String recentBook(int index) {
+		public List<String> books(String pattern) {
+			return SerializerUtil.serializeBookList(myCollection.books(pattern));
+		}
+
+		public List<String> recentBooks() {
+			return SerializerUtil.serializeBookList(myCollection.recentBooks());
+		}
+
+		public List<String> favorites() {
+			return SerializerUtil.serializeBookList(myCollection.favorites());
+		}
+
+		public String getRecentBook(int index) {
 			return SerializerUtil.serialize(myCollection.getRecentBook(index));
 		}
 
-		public String bookById(long id) {
+		public String getBookByFile(String file) {
+			return SerializerUtil.serialize(myCollection.getBookByFile(ZLFile.createFileByPath(file)));
+		}
+
+		public String getBookById(long id) {
 			return SerializerUtil.serialize(myCollection.getBookById(id));
 		}
 
+		public void removeBook(String book, boolean deleteFromDisk) {
+			myCollection.removeBook(SerializerUtil.deserializeBook(book), deleteFromDisk);
+		}
+
+		public void addBookToRecentList(String book) {
+			myCollection.addBookToRecentList(SerializerUtil.deserializeBook(book));
+		}
+
+		public void setBookFavorite(String book, boolean favorite) {
+			myCollection.setBookFavorite(SerializerUtil.deserializeBook(book), favorite);
+		}
+
+		public List<String> invisibleBookmarks(String book) {
+			return SerializerUtil.serializeBookmarkList(
+				myCollection.invisibleBookmarks(SerializerUtil.deserializeBook(book))
+			);
+		}
+
 		public List<String> allBookmarks() {
-			return SerializerUtil.serialize(myCollection.allBookmarks());
+			return SerializerUtil.serializeBookmarkList(myCollection.allBookmarks());
 		}
 
 		public String saveBookmark(String serialized) {
@@ -96,7 +184,7 @@ public class LibraryService extends Service {
 		}
 	}
 
-	private LibraryImplementation myLibrary;
+	private volatile LibraryImplementation myLibrary;
 
 	@Override
 	public void onStart(Intent intent, int startId) {
@@ -126,7 +214,10 @@ public class LibraryService extends Service {
 	@Override
 	public void onDestroy() {
 		System.err.println("LibraryService.onDestroy()");
-		myLibrary = null;
+		if (myLibrary != null) {
+			myLibrary.deactivate();
+			myLibrary = null;
+		}
 		super.onDestroy();
 	}
 }

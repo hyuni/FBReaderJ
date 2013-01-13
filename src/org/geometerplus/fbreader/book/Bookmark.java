@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.fbreader.library;
+package org.geometerplus.fbreader.book;
 
 import java.util.*;
 
@@ -228,17 +228,5 @@ mainLoop:
 	public void update(Bookmark other) {
 		// TODO: copy other fields (?)
 		myId = other.myId;
-	}
-
-	// TODO: this method should be removed
-	public void save() {
-		myId = BooksDatabase.Instance().saveBookmark(this);
-	}
-
-	// TODO: this method should be removed
-	public void delete() {
-		if (myId != -1) {
-			BooksDatabase.Instance().deleteBookmark(this);
-		}
 	}
 }

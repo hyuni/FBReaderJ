@@ -26,7 +26,9 @@ import android.content.*;
 import android.os.IBinder;
 import android.os.RemoteException;
 
-import org.geometerplus.fbreader.library.*;
+import org.geometerplus.zlibrary.core.filesystem.ZLFile;
+
+import org.geometerplus.fbreader.book.*;
 
 public class BookCollectionShadow implements IBookCollection, ServiceConnection {
 	private final Context myContext;
@@ -37,17 +39,36 @@ public class BookCollectionShadow implements IBookCollection, ServiceConnection 
 		myContext = context;
 	}
 
-	public void bindToService(Runnable onBindAction) {
-		myOnBindAction = onBindAction;
-		myContext.bindService(
-			new Intent(myContext, LibraryService.class),
-			this,
-			LibraryService.BIND_AUTO_CREATE
-		);
+	public synchronized void bindToService(Runnable onBindAction) {
+		if (myInterface != null) {
+			if (onBindAction != null) {
+				onBindAction.run();
+			}
+		} else {
+			if (onBindAction != null) {
+				myOnBindAction = onBindAction;
+			}
+			myContext.bindService(
+				new Intent(myContext, LibraryService.class),
+				this,
+				LibraryService.BIND_AUTO_CREATE
+			);
+		}
 	}
 
 	public void unbind() {
-		myContext.unbindService(this);
+		if (myInterface != null) {
+			myContext.unbindService(this);
+			myInterface = null;
+		}
+	}
+
+	public void addListener(Listener listener) {
+		// TODO: implement
+	}
+
+	public void removeListener(Listener listener) {
+		// TODO: implement
 	}
 
 	public synchronized int size() {
@@ -61,12 +82,57 @@ public class BookCollectionShadow implements IBookCollection, ServiceConnection 
 		}
 	}
 
+	public synchronized List<Book> books(String pattern) {
+		if (myInterface == null) {
+			return Collections.emptyList();
+		}
+		try {
+			return SerializerUtil.deserializeBookList(myInterface.books(pattern));
+		} catch (RemoteException e) {
+			return Collections.emptyList();
+		}
+	}
+
+	public synchronized List<Book> recentBooks() {
+		if (myInterface == null) {
+			return Collections.emptyList();
+		}
+		try {
+			return SerializerUtil.deserializeBookList(myInterface.recentBooks());
+		} catch (RemoteException e) {
+			return Collections.emptyList();
+		}
+	}
+
+	public synchronized List<Book> favorites() {
+		if (myInterface == null) {
+			return Collections.emptyList();
+		}
+		try {
+			return SerializerUtil.deserializeBookList(myInterface.favorites());
+		} catch (RemoteException e) {
+			return Collections.emptyList();
+		}
+	}
+
 	public synchronized Book getRecentBook(int index) {
 		if (myInterface == null) {
 			return null;
 		}
 		try {
-			return SerializerUtil.deserializeBook(myInterface.recentBook(index));
+			return SerializerUtil.deserializeBook(myInterface.getRecentBook(index));
+		} catch (RemoteException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+	public synchronized Book getBookByFile(ZLFile file) {
+		if (myInterface == null) {
+			return null;
+		}
+		try {
+			return SerializerUtil.deserializeBook(myInterface.getBookByFile(file.getPath()));
 		} catch (RemoteException e) {
 			return null;
 		}
@@ -77,9 +143,49 @@ public class BookCollectionShadow implements IBookCollection, ServiceConnection 
 			return null;
 		}
 		try {
-			return SerializerUtil.deserializeBook(myInterface.bookById(id));
+			return SerializerUtil.deserializeBook(myInterface.getBookById(id));
 		} catch (RemoteException e) {
 			return null;
+		}
+	}
+
+	public synchronized void removeBook(Book book, boolean deleteFromDisk) {
+		if (myInterface != null) {
+			try {
+				myInterface.removeBook(SerializerUtil.serialize(book), deleteFromDisk);
+			} catch (RemoteException e) {
+			}
+		}
+	}
+
+	public synchronized void addBookToRecentList(Book book) {
+		if (myInterface != null) {
+			try {
+				myInterface.addBookToRecentList(SerializerUtil.serialize(book));
+			} catch (RemoteException e) {
+			}
+		}
+	}
+
+	public synchronized void setBookFavorite(Book book, boolean favorite) {
+		if (myInterface != null) {
+			try {
+				myInterface.setBookFavorite(SerializerUtil.serialize(book), favorite);
+			} catch (RemoteException e) {
+			}
+		}
+	}
+
+	public synchronized List<Bookmark> invisibleBookmarks(Book book) {
+		if (myInterface == null) {
+			return Collections.emptyList();
+		}
+		try {
+			return SerializerUtil.deserializeBookmarkList(
+				myInterface.invisibleBookmarks(SerializerUtil.serialize(book))
+			);
+		} catch (RemoteException e) {
+			return Collections.emptyList();
 		}
 	}
 
@@ -119,11 +225,11 @@ public class BookCollectionShadow implements IBookCollection, ServiceConnection 
 		myInterface = LibraryInterface.Stub.asInterface(service);
 		if (myOnBindAction != null) {
 			myOnBindAction.run();
+			myOnBindAction = null;
 		}
 	}
 
 	// method from ServiceConnection interface
 	public synchronized void onServiceDisconnected(ComponentName name) {
-		myInterface = null;
 	}
 }

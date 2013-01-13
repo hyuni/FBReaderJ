@@ -31,10 +31,8 @@ import org.geometerplus.zlibrary.core.util.ZLColor;
 import org.geometerplus.zlibrary.text.hyphenation.ZLTextHyphenator;
 import org.geometerplus.zlibrary.text.view.*;
 
-import org.geometerplus.fbreader.bookmodel.BookModel;
-import org.geometerplus.fbreader.bookmodel.BookReadingException;
-import org.geometerplus.fbreader.bookmodel.TOCTree;
-import org.geometerplus.fbreader.library.*;
+import org.geometerplus.fbreader.book.*;
+import org.geometerplus.fbreader.bookmodel.*;
 
 public final class FBReaderApp extends ZLApplication {
 	public final ZLBooleanOption AllowScreenBrightnessAdjustmentOption =
@@ -118,7 +116,11 @@ public final class FBReaderApp extends ZLApplication {
 	private ZLTextPosition myJumpEndPosition;
 	private Date myJumpTimeStamp;
 
-	public FBReaderApp() {
+	public final IBookCollection Collection;
+
+	public FBReaderApp(IBookCollection collection) {
+		Collection = collection;
+
 		addAction(ActionCode.INCREASE_FONT, new ChangeFontSizeAction(this, +2));
 		addAction(ActionCode.DECREASE_FONT, new ChangeFontSizeAction(this, -2));
 
@@ -160,9 +162,11 @@ public final class FBReaderApp extends ZLApplication {
 		}
 	}
  
-	public void reloadBook() {
-		if (Model != null && Model.Book != null) {
-			Model.Book.reloadInfoFromDatabase();
+	public void reloadBook(Book book) {
+		if (Model != null) {
+			if (book != null) {
+				Model.Book = book;
+			}
 			runWithMessage("loadingBook", new Runnable() {
 				public void run() {
 					openBookInternal(Model.Book, null, true);
@@ -228,9 +232,9 @@ public final class FBReaderApp extends ZLApplication {
 
 	synchronized void openBookInternal(Book book, Bookmark bookmark, boolean force) {
 		if (book == null) {
-			book = Library.Instance().getRecentBook();
+			book = Collection.getRecentBook(0);
 			if (book == null || !book.File.exists()) {
-				book = Book.getByFile(Library.getHelpFile());
+				book = Collection.getBookByFile(BookCollection.getHelpFile());
 			}
 			if (book == null) {
 				return;
@@ -262,7 +266,7 @@ public final class FBReaderApp extends ZLApplication {
 				} else {
 					gotoBookmark(bookmark);
 				}
-				Library.Instance().addBookToRecentList(book);
+				Collection.addBookToRecentList(book);
 				final StringBuilder title = new StringBuilder(book.getTitle());
 				if (!book.authors().isEmpty()) {
 					boolean first = true;
@@ -300,12 +304,12 @@ public final class FBReaderApp extends ZLApplication {
 				return false;
 			}
 
-			final List<Bookmark> bookmarks = Library.Instance().invisibleBookmarks(Model.Book);
+			final List<Bookmark> bookmarks = Collection.invisibleBookmarks(Model.Book);
 			if (bookmarks.isEmpty()) {
 				return false;
 			}
 			final Bookmark b = bookmarks.get(0);
-			b.delete();
+			Collection.deleteBookmark(b);
 			gotoBookmark(b);
 			return true;
 		} finally {
@@ -336,14 +340,14 @@ public final class FBReaderApp extends ZLApplication {
 		if (file == null) {
 			return null;
 		}
-		Book book = Book.getByFile(file);
+		Book book = Collection.getBookByFile(file);
 		if (book != null) {
 			book.insertIntoBookList();
 			return book;
 		}
 		if (file.isArchive()) {
 			for (ZLFile child : file.children()) {
-				book = Book.getByFile(child);
+				book = Collection.getBookByFile(child);
 				if (book != null) {
 					book.insertIntoBookList();
 					return book;
@@ -414,7 +418,7 @@ public final class FBReaderApp extends ZLApplication {
 			));
 		}
 		if (ShowPreviousBookInCancelMenuOption.getValue()) {
-			final Book previousBook = Library.Instance().getPreviousBook();
+			final Book previousBook = Collection.getRecentBook(1);
 			if (previousBook != null) {
 				myCancelActionsList.add(new CancelActionDescription(
 					CancelActionType.previousBook, previousBook.getTitle()
@@ -423,7 +427,7 @@ public final class FBReaderApp extends ZLApplication {
 		}
 		if (ShowPositionsInCancelMenuOption.getValue()) {
 			if (Model != null && Model.Book != null) {
-				for (Bookmark bookmark : Library.Instance().invisibleBookmarks(Model.Book)) {
+				for (Bookmark bookmark : Collection.invisibleBookmarks(Model.Book)) {
 					myCancelActionsList.add(new BookmarkDescription(bookmark));
 				}
 			}
@@ -448,12 +452,12 @@ public final class FBReaderApp extends ZLApplication {
 				runAction(ActionCode.SHOW_NETWORK_LIBRARY);
 				break;
 			case previousBook:
-				openBook(Library.Instance().getPreviousBook(), null, null);
+				openBook(Collection.getRecentBook(1), null, null);
 				break;
 			case returnTo:
 			{
 				final Bookmark b = ((BookmarkDescription)description).Bookmark;
-				b.delete();
+				Collection.deleteBookmark(b);
 				gotoBookmark(b);
 				break;
 			}
@@ -465,15 +469,15 @@ public final class FBReaderApp extends ZLApplication {
 
 	private synchronized void updateInvisibleBookmarksList(Bookmark b) {
 		if (Model != null && Model.Book != null && b != null) {
-			for (Bookmark bm : Library.Instance().invisibleBookmarks(Model.Book)) {
+			for (Bookmark bm : Collection.invisibleBookmarks(Model.Book)) {
 				if (b.equals(bm)) {
-					bm.delete();
+					Collection.deleteBookmark(bm);
 				}
 			}
-			b.save();
-			final List<Bookmark> bookmarks = Library.Instance().invisibleBookmarks(Model.Book);
+			Collection.saveBookmark(b);
+			final List<Bookmark> bookmarks = Collection.invisibleBookmarks(Model.Book);
 			for (int i = 3; i < bookmarks.size(); ++i) {
-				bookmarks.get(i).delete();
+				Collection.deleteBookmark(bookmarks.get(i));
 			}
 		}
 	}

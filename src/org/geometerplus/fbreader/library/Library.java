@@ -22,10 +22,16 @@ package org.geometerplus.fbreader.library;
 import java.util.*;
 
 import org.geometerplus.zlibrary.core.filesystem.*;
+import org.geometerplus.zlibrary.core.resources.ZLResource;
 
+import org.geometerplus.fbreader.book.*;
 import org.geometerplus.fbreader.tree.FBTree;
 
 public final class Library {
+	public static ZLResource resource() {
+		return ZLResource.resource("library");
+	}
+
 	private final List<ChangeListener> myListeners = Collections.synchronizedList(new LinkedList<ChangeListener>());
 
 	public interface ChangeListener {
@@ -70,15 +76,7 @@ public final class Library {
 	public static final int REMOVE_FROM_DISK = 0x02;
 	public static final int REMOVE_FROM_LIBRARY_AND_DISK = REMOVE_FROM_LIBRARY | REMOVE_FROM_DISK;
 
-	private static Library ourInstance;
-	public static Library Instance() {
-		if (ourInstance == null) {
-			ourInstance = new Library(BooksDatabase.Instance());
-		}
-		return ourInstance;
-	}
-
-	private final BookCollection myCollection;
+	private final IBookCollection myCollection;
 
 	private final RootTree myRootTree = new RootTree();
 	private boolean myDoGroupTitlesByFirstLetter;
@@ -97,8 +95,8 @@ public final class Library {
 		}
 	}
 
-	public Library(BooksDatabase db) {
-		myCollection = new BookCollection(db);
+	public Library(BookCollection collection) {
+		myCollection = collection;
 		myCollection.addListener(new BookCollection.Listener() {
 			public void onBookEvent(BookEvent event, Book book) {
 				switch (event) {
@@ -136,7 +134,7 @@ public final class Library {
 		new FirstLevelTree(myRootTree, ROOT_BY_AUTHOR);
 		new FirstLevelTree(myRootTree, ROOT_BY_TITLE);
 		new FirstLevelTree(myRootTree, ROOT_BY_TAG);
-		new FileFirstLevelTree(myRootTree, ROOT_FILE_TREE);
+		new FileFirstLevelTree(collection, myRootTree, ROOT_FILE_TREE);
 	}
 
 	public LibraryTree getRootTree() {
@@ -156,26 +154,6 @@ public final class Library {
 		}
 		final LibraryTree parentTree = getLibraryTree(key.Parent);
 		return parentTree != null ? (LibraryTree)parentTree.getSubTree(key.Id) : null;
-	}
-
-	public static ZLResourceFile getHelpFile() {
-		final Locale locale = Locale.getDefault();
-
-		ZLResourceFile file = ZLResourceFile.createResourceFile(
-			"data/help/MiniHelp." + locale.getLanguage() + "_" + locale.getCountry() + ".fb2"
-		);
-		if (file.exists()) {
-			return file;
-		}
-
-		file = ZLResourceFile.createResourceFile(
-			"data/help/MiniHelp." + locale.getLanguage() + ".fb2"
-		);
-		if (file.exists()) {
-			return file;
-		}
-
-		return ZLResourceFile.createResourceFile("data/help/MiniHelp.en.fb2");
 	}
 
 	private final List<?> myNullList = Collections.singletonList(null);
@@ -234,10 +212,11 @@ public final class Library {
 			getTagTree(t).getBookSubTree(book, true);
 		}
 
-		final SearchResultsTree found =
-			(SearchResultsTree)getFirstLevelTree(ROOT_FOUND);
-		if (found != null && book.matches(found.getPattern())) {
-			found.getBookSubTree(book, true);
+		synchronized (this) {
+			final SearchResultsTree found = (SearchResultsTree)getFirstLevelTree(ROOT_FOUND);
+			if (found != null && book.matches(found.getPattern())) {
+				found.getBookSubTree(book, true);
+			}
 		}
 	}
 
@@ -264,6 +243,7 @@ public final class Library {
 			return;
 		}
 
+		book.save(true);
 		refreshInTree(ROOT_FAVORITES, book);
 		refreshInTree(ROOT_RECENT, book);
 		removeFromTree(ROOT_FOUND, book);
@@ -275,20 +255,8 @@ public final class Library {
 		fireModelChangedEvent(ChangeListener.Code.BookAdded);
 	}
 
-	public synchronized void startBuild() {
-		myCollection.startBuild();
-	}
-
 	public boolean isUpToDate() {
 		return myStatusMask == 0;
-	}
-
-	public Book getRecentBook() {
-		return myCollection.getRecentBook(0);
-	}
-
-	public Book getPreviousBook() {
-		return myCollection.getRecentBook(1);
 	}
 
 	public void startBookSearch(final String pattern) {
@@ -321,19 +289,17 @@ public final class Library {
 		}
 		
 		FirstLevelTree newSearchResults = null;
-		for (Book book : myCollection.books()) {
-			if (book.matches(pattern)) {
-				synchronized (this) {
-					if (newSearchResults == null) {
-						if (oldSearchResults != null) {
-							oldSearchResults.removeSelf();
-						}
-						newSearchResults = new SearchResultsTree(myRootTree, ROOT_FOUND, pattern);
-						fireModelChangedEvent(ChangeListener.Code.Found);
+		synchronized (this) {
+			for (Book book : myCollection.books(pattern)) {
+				if (newSearchResults == null) {
+					if (oldSearchResults != null) {
+						oldSearchResults.removeSelf();
 					}
-					newSearchResults.getBookSubTree(book, true);
-					fireModelChangedEvent(ChangeListener.Code.BookAdded);
+					newSearchResults = new SearchResultsTree(myRootTree, ROOT_FOUND, pattern);
+					fireModelChangedEvent(ChangeListener.Code.Found);
 				}
+				newSearchResults.getBookSubTree(book, true);
+				fireModelChangedEvent(ChangeListener.Code.BookAdded);
 			}
 		}
 		if (newSearchResults == null) {
@@ -396,9 +362,5 @@ public final class Library {
 		getFirstLevelTree(ROOT_RECENT).removeBook(book, false);
 		getFirstLevelTree(ROOT_FAVORITES).removeBook(book, false);
 		myRootTree.removeBook(book, true);
-	}
-
-	public List<Bookmark> invisibleBookmarks(Book book) {
-		return myCollection.invisibleBookmarks(book);
 	}
 }

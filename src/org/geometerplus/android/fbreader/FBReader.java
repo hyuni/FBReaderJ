@@ -35,6 +35,7 @@ import android.widget.TextView;
 
 import org.geometerplus.zlibrary.core.filesystem.ZLFile;
 import org.geometerplus.zlibrary.core.library.ZLibrary;
+import org.geometerplus.zlibrary.core.resources.ZLResource;
 
 import org.geometerplus.zlibrary.text.view.ZLTextView;
 import org.geometerplus.zlibrary.text.hyphenation.ZLTextHyphenator;
@@ -44,15 +45,16 @@ import org.geometerplus.zlibrary.ui.android.library.*;
 import org.geometerplus.zlibrary.ui.android.view.AndroidFontUtil;
 import org.geometerplus.zlibrary.ui.android.view.ZLAndroidWidget;
 
-import org.geometerplus.fbreader.fbreader.ActionCode;
-import org.geometerplus.fbreader.fbreader.FBReaderApp;
+import org.geometerplus.fbreader.book.*;
 import org.geometerplus.fbreader.bookmodel.BookModel;
-import org.geometerplus.fbreader.library.Book;
+import org.geometerplus.fbreader.fbreader.*;
 import org.geometerplus.fbreader.tips.TipsManager;
 
-import org.geometerplus.android.fbreader.library.SQLiteBooksDatabase;
-import org.geometerplus.android.fbreader.library.KillerCallback;
 import org.geometerplus.android.fbreader.api.*;
+import org.geometerplus.android.fbreader.library.BookInfoActivity;
+import org.geometerplus.android.fbreader.library.KillerCallback;
+import org.geometerplus.android.fbreader.library.SQLiteBooksDatabase;
+import org.geometerplus.android.fbreader.libraryService.BookCollectionShadow;
 import org.geometerplus.android.fbreader.tips.TipsActivity;
 
 import org.geometerplus.android.util.UIUtil;
@@ -128,6 +130,15 @@ public final class FBReader extends ZLAndroidActivity {
 				});
 			}
 		};
+	}
+
+	private BookCollectionShadow getCollection() {
+		return (BookCollectionShadow)((FBReaderApp)FBReaderApp.Instance()).Collection;
+	}
+
+	@Override
+	protected void init(Runnable action) {
+		getCollection().bindToService(action);
 	}
 
 	@Override
@@ -238,7 +249,13 @@ public final class FBReader extends ZLAndroidActivity {
 	}
 
 	@Override
-	public void onStart() {
+	protected void onRestart() {
+		super.onRestart();
+		getCollection().bindToService(null);
+	}
+
+	@Override
+	protected void onStart() {
 		super.onStart();
 
 		initPluginActions();
@@ -328,6 +345,7 @@ public final class FBReader extends ZLAndroidActivity {
 	public void onStop() {
 		ApiServerImplementation.sendEvent(this, ApiListener.EVENT_READ_MODE_CLOSED);
 		PopupPanel.removeAllWindows(FBReaderApp.Instance(), this);
+		getCollection().unbind();
 		super.onStop();
 	}
 
@@ -336,7 +354,7 @@ public final class FBReader extends ZLAndroidActivity {
 		if (SQLiteBooksDatabase.Instance() == null) {
 			new SQLiteBooksDatabase(this, "READER");
 		}
-		return new FBReaderApp();
+		return new FBReaderApp(new BookCollectionShadow(this));
 	}
 
 	@Override
@@ -374,7 +392,10 @@ public final class FBReader extends ZLAndroidActivity {
 		}
 	}
 
-	private void onPreferencesUpdate(int resultCode) {
+	private void onPreferencesUpdate(int resultCode, Book book) {
+		if (book != null) {
+			book.save(true);
+		}
 		final FBReaderApp fbReader = (FBReaderApp)FBReaderApp.Instance();
 		switch (resultCode) {
 			case RESULT_DO_NOTHING:
@@ -383,11 +404,10 @@ public final class FBReader extends ZLAndroidActivity {
 			{
 				AndroidFontUtil.clearFontCache();
 				final BookModel model = fbReader.Model;
-				if (model != null) {
-					final Book book = model.Book;
-					if (book != null) {
-						book.reloadInfoFromDatabase();
-						ZLTextHyphenator.Instance().load(book.getLanguage());
+				if (model != null && book != null) {
+					if (model.Book != null) {
+						model.Book = book;
+						ZLTextHyphenator.Instance().load(model.Book.getLanguage());
 					}
 				}
 				fbReader.clearTextCaches();
@@ -395,7 +415,7 @@ public final class FBReader extends ZLAndroidActivity {
 				break;
 			}
 			case RESULT_RELOAD_BOOK:
-				fbReader.reloadBook();
+				fbReader.reloadBook(book);
 				break;
 		}
 	}
@@ -405,7 +425,7 @@ public final class FBReader extends ZLAndroidActivity {
 		switch (requestCode) {
 			case REQUEST_PREFERENCES:
 			case REQUEST_BOOK_INFO:
-				onPreferencesUpdate(resultCode);
+				onPreferencesUpdate(resultCode, BookInfoActivity.bookByIntent(data));
 				break;
 			case REQUEST_CANCEL_MENU:
 				((FBReaderApp)FBReaderApp.Instance()).runCancelAction(resultCode - 1);
@@ -550,5 +570,26 @@ public final class FBReader extends ZLAndroidActivity {
 			view.setText(title);
 			view.postInvalidate();
 		}
+	}
+
+	void addSelectionBookmark() {
+		final FBReaderApp fbReader = (FBReaderApp)FBReaderApp.Instance();
+		final FBView fbView = fbReader.getTextView();
+		final String text = fbView.getSelectedText();
+
+		final Bookmark bookmark = new Bookmark(
+			fbReader.Model.Book,
+			fbView.getModel().getId(),
+			fbView.getSelectionStartPosition(),
+			text,
+			true
+		);
+		fbReader.Collection.saveBookmark(bookmark);
+		fbView.clearSelection();
+
+		UIUtil.showMessageText(
+			this,
+			ZLResource.resource("selection").getResource("bookmarkCreated").getValue().replace("%s", text)
+		);
 	}
 }

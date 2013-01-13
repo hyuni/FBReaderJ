@@ -24,17 +24,22 @@ import java.util.*;
 import org.geometerplus.zlibrary.core.filesystem.ZLFile;
 import org.geometerplus.zlibrary.core.image.ZLImage;
 
+import org.geometerplus.fbreader.book.Book;
+import org.geometerplus.fbreader.book.BookUtil;
+import org.geometerplus.fbreader.book.IBookCollection;
 import org.geometerplus.fbreader.formats.PluginCollection;
 import org.geometerplus.fbreader.tree.FBTree;
 
 public class FileTree extends LibraryTree {
+	private final IBookCollection myCollection;
 	private final ZLFile myFile;
 	private final String myName;
 	private final String mySummary;
 	private final boolean myIsSelectable;
 
-	FileTree(LibraryTree parent, ZLFile file, String name, String summary) {
+	FileTree(LibraryTree parent, IBookCollection collection, ZLFile file, String name, String summary) {
 		super(parent);
+		myCollection = collection;
 		myFile = file;
 		myName = name;
 		mySummary = summary;
@@ -43,6 +48,7 @@ public class FileTree extends LibraryTree {
 
 	public FileTree(FileTree parent, ZLFile file) {
 		super(parent);
+		myCollection = parent.myCollection;
 		myFile = file;
 		myName = null;
 		mySummary = null;
@@ -85,7 +91,7 @@ public class FileTree extends LibraryTree {
 
 	@Override
 	public ZLImage createCover() {
-		return LibraryUtil.getCover(getBook());
+		return BookUtil.getCover(getBook());
 	}
 
 	public ZLFile getFile() {
@@ -98,7 +104,7 @@ public class FileTree extends LibraryTree {
 	@Override
 	public Book getBook() {
 		if (myBook == null) {
-			myBook = Book.getByFile(myFile);
+			myBook = myCollection.getBookByFile(myFile);
 			if (myBook == null) {
 				myBook = NULL_BOOK;
 			}

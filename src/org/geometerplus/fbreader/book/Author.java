@@ -17,29 +17,35 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.fbreader.library;
+package org.geometerplus.fbreader.book;
 
-import org.geometerplus.zlibrary.core.filesystem.ZLFile;
-import org.geometerplus.zlibrary.core.image.ZLImage;
-import org.geometerplus.zlibrary.core.resources.ZLResource;
+public final class Author {
+	public final String DisplayName;
+	public final String SortKey;
 
-import org.geometerplus.fbreader.formats.FormatPlugin;
-import org.geometerplus.fbreader.bookmodel.BookReadingException;
-
-public abstract class LibraryUtil {
-	public static ZLResource resource() {
-		return ZLResource.resource("library");
+	public Author(String displayName, String sortKey) {
+		DisplayName = displayName;
+		SortKey = sortKey;
+	}
+		
+	public static int hashCode(Author author) {
+		return author == null ? 0 : author.hashCode();
 	}
 
-	public static ZLImage getCover(Book book) {
-		return book != null ? book.getCover() : null;
-	}
-
-	public static String getAnnotation(Book book) {
-		try {
-			return book.getPlugin().readAnnotation(book.File);
-		} catch (BookReadingException e) {
-			return null;
+	@Override
+	public boolean equals(Object o) {
+		if (o == this) {
+			return true;
 		}
+		if (!(o instanceof Author)) {
+			return false;
+		}
+		Author a = (Author)o;
+		return SortKey.equals(a.SortKey) && DisplayName.equals(a.DisplayName);
+	}
+
+	@Override
+	public int hashCode() {
+		return SortKey.hashCode() + DisplayName.hashCode();
 	}
 }
