@@ -96,7 +96,6 @@ public class BookmarksActivity extends TabActivity implements MenuItem.OnMenuIte
 			for (Bookmark bm : myAllBooksBookmarks) {
 				if (bm.getBookId() == bookId) {
 					myThisBookBookmarks.add(bm);
-
 				}
 			}
 
