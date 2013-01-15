@@ -146,15 +146,8 @@ public class BookCollection extends AbstractBookCollection {
 				event = Listener.BookEvent.Updated;
 			}
 			myBooksByFile.put(book.File, book);
-			addBookById(book);
+			myBooksById.put(book.getId(), book);
 			fireBookEvent(event, book);
-		}
-	}
-
-	private void addBookById(Book book) {
-		final long id = book.getId();
-		if (id != -1) {
-			myBooksById.put(id, book);
 		}
 	}
 
@@ -171,6 +164,7 @@ public class BookCollection extends AbstractBookCollection {
 		synchronized (myBooksByFile) {
 			myBooksByFile.remove(book.File);
 			myBooksById.remove(book.getId());
+
 			final List<Long> ids = myDatabase.loadRecentBookIds();
 			if (ids.remove(book.getId())) {
 				myDatabase.saveRecentBookIds(ids);
@@ -371,7 +365,7 @@ public class BookCollection extends AbstractBookCollection {
 			public void run() {
 				for (Book book : newBooks) {
 					saveBook(book, false);
-					addBookById(book);
+					addBook(book, false);
 				}
 			}
 		});
@@ -424,7 +418,6 @@ public class BookCollection extends AbstractBookCollection {
 				if (doReadMetaInfo) {
 					book.readMetaInfo();
 				}
-				addBook(book, false);
 				newBooks.add(book);
 				return;
 			}
@@ -434,7 +427,6 @@ public class BookCollection extends AbstractBookCollection {
 
 		try {
 			final Book book = new Book(file);
-			addBook(book, false);
 			newBooks.add(book);
 			return;
 		} catch (BookReadingException e) {
