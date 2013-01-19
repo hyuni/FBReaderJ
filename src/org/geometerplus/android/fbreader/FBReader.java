@@ -521,6 +521,7 @@ public final class FBReader extends ZLAndroidActivity {
 		return true;
 	}
 
+<<<<<<< HEAD
 	private NavigationPopup myNavigationPopup;
 
 	boolean barsAreShown() {
@@ -597,6 +598,7 @@ public final class FBReader extends ZLAndroidActivity {
 		}
 	}
 
+<<<<<<< HEAD
 	void addSelectionBookmark() {
 		final FBReaderApp fbReader = (FBReaderApp)FBReaderApp.Instance();
 		final FBView fbView = fbReader.getTextView();
@@ -616,5 +618,17 @@ public final class FBReader extends ZLAndroidActivity {
 			this,
 			ZLResource.resource("selection").getResource("bookmarkCreated").getValue().replace("%s", text)
 		);
+	}
+
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		final View view = findViewById(R.id.main_view);
+		return (view != null && view.onKeyDown(keyCode, event)) || super.onKeyDown(keyCode, event);
+	}
+
+	@Override
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		final View view = findViewById(R.id.main_view);
+		return (view != null && view.onKeyUp(keyCode, event)) || super.onKeyUp(keyCode, event);
 	}
 }
