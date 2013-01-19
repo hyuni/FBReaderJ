@@ -629,7 +629,6 @@ public final class FBReader extends ZLAndroidActivity {
 		}
 	}
 
-	@Override
 	public void refresh() {
 		if (myNavigationPopup != null) {
 			myNavigationPopup.update();
