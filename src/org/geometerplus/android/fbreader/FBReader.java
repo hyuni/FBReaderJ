@@ -522,6 +522,7 @@ public final class FBReader extends ZLAndroidActivity {
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	private NavigationPopup myNavigationPopup;
 
 	boolean barsAreShown() {
@@ -598,7 +599,6 @@ public final class FBReader extends ZLAndroidActivity {
 		}
 	}
 
-<<<<<<< HEAD
 	void addSelectionBookmark() {
 		final FBReaderApp fbReader = (FBReaderApp)FBReaderApp.Instance();
 		final FBView fbView = fbReader.getTextView();
