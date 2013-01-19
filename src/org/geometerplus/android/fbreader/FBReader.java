@@ -179,11 +179,12 @@ public final class FBReader extends Activity {
 
 		zlibrary.setActivity(this);
 
-		final ZLAndroidApplication androidApplication = (ZLAndroidApplication)getApplication();
 		myFBReaderApp = (FBReaderApp)FBReaderApp.Instance();
 		if (myFBReaderApp == null) {
 			myFBReaderApp = new FBReaderApp(new BookCollectionShadow());
 		}
+
+		final ZLAndroidApplication androidApplication = (ZLAndroidApplication)getApplication();
 		if (androidApplication.myMainWindow == null) {
 			androidApplication.myMainWindow = new ZLAndroidApplicationWindow(myFBReaderApp);
 			myFBReaderApp.initWindow();
@@ -618,9 +619,8 @@ public final class FBReader extends Activity {
 		root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
 
 		if (myNavigationPopup == null) {
-			final FBReaderApp fbreader = (FBReaderApp)FBReaderApp.Instance();
-			fbreader.hideActivePopup();
-			myNavigationPopup = new NavigationPopup(fbreader);
+			myFBReaderApp.hideActivePopup();
+			myNavigationPopup = new NavigationPopup(myFBReaderApp);
 			myNavigationPopup.runNavigation(this, root);
 		}
 	}
