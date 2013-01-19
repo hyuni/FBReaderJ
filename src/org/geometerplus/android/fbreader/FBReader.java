@@ -146,10 +146,6 @@ public final class FBReader extends ZLAndroidActivity {
 
 		Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler(this));
 
-		requestWindowFeature(Window.FEATURE_NO_TITLE);
-		setContentView(R.layout.main);
-		setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL);
-
 		final ZLAndroidLibrary zlibrary = getZLibrary();
 		getWindow().setFlags(
 			WindowManager.LayoutParams.FLAG_FULLSCREEN,
