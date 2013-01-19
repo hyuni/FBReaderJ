@@ -34,7 +34,6 @@ import org.geometerplus.zlibrary.ui.android.R;
 import org.geometerplus.zlibrary.ui.android.application.ZLAndroidApplicationWindow;
 
 public abstract class ZLAndroidActivity extends Activity {
-	protected abstract ZLApplication createApplication();
 	protected abstract void init(Runnable action);
 
 	private void setScreenBrightnessAuto() {
@@ -52,7 +51,7 @@ public abstract class ZLAndroidActivity extends Activity {
 		final WindowManager.LayoutParams attrs = getWindow().getAttributes();
 		attrs.screenBrightness = percent / 100.0f;
 		getWindow().setAttributes(attrs);
-		getLibrary().ScreenBrightnessLevelOption.setValue(percent);
+		getZLibrary().ScreenBrightnessLevelOption.setValue(percent);
 	}
 
 	final int getScreenBrightness() {
@@ -67,46 +66,6 @@ public abstract class ZLAndroidActivity extends Activity {
 	}
 
 	protected abstract ZLFile fileFromIntent(Intent intent);
-
-	@Override
-	public void onCreate(Bundle state) {
-		super.onCreate(state);
-
-		Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler(this));
-
-		final ZLAndroidLibrary zlibrary = getLibrary();
-		getWindow().setFlags(
-			WindowManager.LayoutParams.FLAG_FULLSCREEN,
-			zlibrary.ShowStatusBarOption.getValue() ? 0 : WindowManager.LayoutParams.FLAG_FULLSCREEN
-		);
-		if (!zlibrary.ShowActionBarOption.getValue()) {
-			requestWindowFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
-		}
-		setContentView(R.layout.main);
-		setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL);
-
-		zlibrary.setActivity(this);
-
-		final ZLAndroidApplication androidApplication = (ZLAndroidApplication)getApplication();
-		if (androidApplication.myMainWindow == null) {
-			final ZLApplication application = createApplication();
-			androidApplication.myMainWindow = new ZLAndroidApplicationWindow(application);
-			application.initWindow();
-		}
-
-		init(new Runnable() {
-			public void run() {
-				new Thread() {
-					public void run() {
-						ZLApplication.Instance().openFile(fileFromIntent(getIntent()), getPostponedInitAction());
-						ZLApplication.Instance().getViewWidget().repaint();
-					}
-				}.start();
-
-				ZLApplication.Instance().getViewWidget().repaint();
-			}
-		});
-	}
 
 	protected abstract Runnable getPostponedInitAction();
 
@@ -153,18 +112,18 @@ public abstract class ZLAndroidActivity extends Activity {
 	public void onResume() {
 		super.onResume();
 		switchWakeLock(
-			getLibrary().BatteryLevelToTurnScreenOffOption.getValue() <
+			getZLibrary().BatteryLevelToTurnScreenOffOption.getValue() <
 			ZLApplication.Instance().getBatteryLevel()
 		);
 		myStartTimer = true;
 		final int brightnessLevel =
-			getLibrary().ScreenBrightnessLevelOption.getValue();
+			getZLibrary().ScreenBrightnessLevelOption.getValue();
 		if (brightnessLevel != 0) {
 			setScreenBrightness(brightnessLevel);
 		} else {
 			setScreenBrightnessAuto();
 		}
-		if (getLibrary().DisableButtonLightsOption.getValue()) {
+		if (getZLibrary().DisableButtonLightsOption.getValue()) {
 			setButtonLight(false);
 		}
 
@@ -176,7 +135,7 @@ public abstract class ZLAndroidActivity extends Activity {
 		unregisterReceiver(myBatteryInfoReceiver);
 		ZLApplication.Instance().stopTimer();
 		switchWakeLock(false);
-		if (getLibrary().DisableButtonLightsOption.getValue()) {
+		if (getZLibrary().DisableButtonLightsOption.getValue()) {
 			setButtonLight(true);
 		}
 		ZLApplication.Instance().onWindowClosing();
@@ -202,7 +161,7 @@ public abstract class ZLAndroidActivity extends Activity {
 		}
 	}
 
-	private static ZLAndroidLibrary getLibrary() {
+	protected static ZLAndroidLibrary getZLibrary() {
 		return (ZLAndroidLibrary)ZLAndroidLibrary.Instance();
 	}
 
@@ -226,7 +185,7 @@ public abstract class ZLAndroidActivity extends Activity {
 			final ZLAndroidApplication application = (ZLAndroidApplication)getApplication();
 			application.myMainWindow.setBatteryLevel(level);
 			switchWakeLock(
-				getLibrary().BatteryLevelToTurnScreenOffOption.getValue() < level
+				getZLibrary().BatteryLevelToTurnScreenOffOption.getValue() < level
 			);
 		}
 	};
