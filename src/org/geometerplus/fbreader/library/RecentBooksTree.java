@@ -17,31 +17,29 @@
  * 02110-1301, USA.
  */
 
-package org.geometerplus.fbreader.book;
+package org.geometerplus.fbreader.library;
 
-import java.math.BigDecimal;
+import org.geometerplus.fbreader.book.Book;
+import org.geometerplus.fbreader.book.IBookCollection;
 
-public final class SeriesInfo {
-	public static SeriesInfo createSeriesInfo(String title, String index) {
-		if (title == null) {
-			return null;
-		}
-		return new SeriesInfo(title, createIndex(index));
+public class RecentBooksTree extends FirstLevelTree {
+	private final IBookCollection myCollection;
+
+	RecentBooksTree(IBookCollection collection, RootTree root, String id) {
+		super(root, id);
+		myCollection = collection;
 	}
 
-	public static BigDecimal createIndex(String index) {
-		try {
-			return index != null ? new BigDecimal(index).stripTrailingZeros() : null;
-		} catch (NumberFormatException e) {
-			return null;
-		}
+	@Override
+	public Status getOpeningStatus() {
+		return Status.ALWAYS_RELOAD_BEFORE_OPENING;
 	}
 
-	public final String Title;
-	public final BigDecimal Index;
-
-	SeriesInfo(String title, BigDecimal index) {
-		Title = title;
-		Index = index;
+	@Override
+	public void waitForOpening() {
+		clear();
+		for (Book book : myCollection.recentBooks()) {
+			new BookTree(this, book, true);
+		}
 	}
 }
