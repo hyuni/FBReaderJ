@@ -68,8 +68,7 @@ public final class FBReader extends Activity {
 
 	public static final int REQUEST_PREFERENCES = 1;
 	public static final int REQUEST_BOOK_INFO = 2;
-	public static final int REQUEST_LIBRARY = 3;
-	public static final int REQUEST_CANCEL_MENU = 4;
+	public static final int REQUEST_CANCEL_MENU = 3;
 
 	public static final int RESULT_DO_NOTHING = RESULT_FIRST_USER;
 	public static final int RESULT_REPAINT = RESULT_FIRST_USER + 1;
@@ -418,6 +417,16 @@ public final class FBReader extends Activity {
 		hideBars();
 
 		ApiServerImplementation.sendEvent(this, ApiListener.EVENT_READ_MODE_OPENED);
+
+		getCollection().bindToService(this, new Runnable() {
+			public void run() {
+				final BookModel model = myFBReaderApp.Model;
+				if (model == null || model.Book == null) {
+					return;
+				}
+				onPreferencesUpdate(myFBReaderApp.Collection.getBookById(model.Book.getId()));
+			}
+		});
 	}
 
 	@Override
@@ -507,23 +516,15 @@ public final class FBReader extends Activity {
 				if (resultCode != RESULT_DO_NOTHING) {
 					final Book book = BookInfoActivity.bookByIntent(data);
 					if (book != null) {
-						myFBReaderApp.Collection.saveBook(book, true);
-						onPreferencesUpdate(BookInfoActivity.bookByIntent(data));
+						getCollection().bindToService(this, new Runnable() {
+							public void run() {
+								myFBReaderApp.Collection.saveBook(book, true);
+								onPreferencesUpdate(book);
+							}
+						});
 					}
 				}
 				break;
-			case REQUEST_LIBRARY:
-			{
-				getCollection().bindToService(this, new Runnable() {
-					public void run() {
-						final BookModel model = myFBReaderApp.Model;
-						if (model != null && model.Book != null) {
-							onPreferencesUpdate(myFBReaderApp.Collection.getBookById(model.Book.getId()));
-						}
-					}
-				});
-				break;
-			}
 			case REQUEST_CANCEL_MENU:
 				myFBReaderApp.runCancelAction(resultCode - 1);
 				break;
