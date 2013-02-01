@@ -156,7 +156,7 @@ public class LibraryActivity extends TreeActivity<LibraryTree> implements MenuIt
 			((BookCollectionShadow)myLibrary.Collection).bindToService(this, new Runnable() {
 				public void run() {
 					myLibrary.refreshBookInfo(book);
-					if (((LibraryTree)getCurrentTree()).onBookChanged(book)) {
+					if (getCurrentTree().onBookChanged(book)) {
 						getListView().invalidateViews();
 					}
 				}
@@ -248,7 +248,7 @@ public class LibraryActivity extends TreeActivity<LibraryTree> implements MenuIt
 				return true;
 			case REMOVE_FROM_FAVORITES_ITEM_ID:
 				myLibrary.Collection.setBookFavorite(book, false);
-				if (((LibraryTree)getCurrentTree()).onBookChanged(book)) {
+				if (getCurrentTree().onBookChanged(book)) {
 					getListAdapter().replaceAll(getCurrentTree().subTrees());
 					getListView().invalidateViews();
 				}
