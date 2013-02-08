@@ -84,18 +84,6 @@ public class Book {
 		mySeriesInfo = book.mySeriesInfo;
 	}
 
-	public void updateFrom(Book book) {
-		if (myId != book.myId) {
-			return;
-		}
-		myTitle = book.myTitle;
-		myEncoding = book.myEncoding;
-		myLanguage = book.myLanguage;
-		myAuthors = book.myAuthors != null ? new ArrayList<Author>(book.myAuthors) : null;
-		myTags = book.myTags != null ? new ArrayList<Tag>(book.myTags) : null;
-		mySeriesInfo = book.mySeriesInfo;
-	}
-
 	public void reloadInfoFromFile() {
 		try {
 			readMetaInfo();
