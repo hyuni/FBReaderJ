@@ -90,6 +90,9 @@ public final class FBReader extends Activity {
 	private FBReaderApp myFBReaderApp;
 	private volatile Book myBook;
 
+	private RelativeLayout myRootView;
+	private ZLAndroidWidget myMainView;
+
 	private boolean myShowStatusBarFlag;
 	private boolean myShowActionBarFlag;
 	private boolean myActionBarIsVisible;
@@ -187,6 +190,8 @@ public final class FBReader extends Activity {
 			requestWindowFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
 		}
 		setContentView(R.layout.main);
+		myRootView = (RelativeLayout)findViewById(R.id.root_view);
+		myMainView = (ZLAndroidWidget)findViewById(R.id.main_view);
 		setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL);
 
 		zlibrary.setActivity(this);
@@ -344,9 +349,8 @@ public final class FBReader extends Activity {
 
 		SetScreenOrientationAction.setOrientation(this, zlibrary.OrientationOption.getValue());
 
-		final RelativeLayout root = (RelativeLayout)findViewById(R.id.root_view);
-		((PopupPanel)myFBReaderApp.getPopupById(TextSearchPopup.ID)).setPanelInfo(this, root);
-		((PopupPanel)myFBReaderApp.getPopupById(SelectionPopup.ID)).setPanelInfo(this, root);
+		((PopupPanel)myFBReaderApp.getPopupById(TextSearchPopup.ID)).setPanelInfo(this, myRootView);
+		((PopupPanel)myFBReaderApp.getPopupById(SelectionPopup.ID)).setPanelInfo(this, myRootView);
 	}
 
 	private void initPluginActions() {
@@ -698,14 +702,12 @@ public final class FBReader extends Activity {
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
-		final View view = findViewById(R.id.main_view);
-		return (view != null && view.onKeyDown(keyCode, event)) || super.onKeyDown(keyCode, event);
+		return (myMainView != null && myMainView.onKeyDown(keyCode, event)) || super.onKeyDown(keyCode, event);
 	}
 
 	@Override
 	public boolean onKeyUp(int keyCode, KeyEvent event) {
-		final View view = findViewById(R.id.main_view);
-		return (view != null && view.onKeyUp(keyCode, event)) || super.onKeyUp(keyCode, event);
+		return (myMainView != null && myMainView.onKeyUp(keyCode, event)) || super.onKeyUp(keyCode, event);
 	}
 
 	private void setButtonLight(boolean enabled) {
