@@ -270,6 +270,10 @@ public final class FBReader extends Activity {
 		}
 	}
 
+	public ZLAndroidWidget getMainView() {
+		return myMainView;
+	}
+
 	@Override
 	protected void onNewIntent(final Intent intent) {
 		final String action = intent.getAction();
@@ -615,8 +619,7 @@ public final class FBReader extends Activity {
 	private void setStatusBarVisibility(boolean visible) {
 		final ZLAndroidLibrary zlibrary = (ZLAndroidLibrary)ZLibrary.Instance();
 		if (!zlibrary.isKindleFire() && !zlibrary.ShowStatusBarOption.getValue()) {
-			final ZLAndroidWidget main = (ZLAndroidWidget)findViewById(R.id.main_view);
-			main.setPreserveSize(visible);
+			myMainView.setPreserveSize(visible);
 			if (visible) {
 				getWindow().addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
 				getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -641,7 +644,7 @@ public final class FBReader extends Activity {
 		}
 
 		if (zlibrary.DisableButtonLightsOption.getValue()) {
-			findViewById(R.id.root_view).setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+			myRootView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
 		}
 
 		setStatusBarVisibility(false);
@@ -654,13 +657,12 @@ public final class FBReader extends Activity {
 		myActionBarIsVisible = true;
 		invalidateOptionsMenu();
 
-		final RelativeLayout root = (RelativeLayout)findViewById(R.id.root_view);
-		root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+		myRootView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
 
 		if (myNavigationPopup == null) {
 			myFBReaderApp.hideActivePopup();
 			myNavigationPopup = new NavigationPopup(myFBReaderApp);
-			myNavigationPopup.runNavigation(this, root);
+			myNavigationPopup.runNavigation(this, myRootView);
 		}
 	}
 
