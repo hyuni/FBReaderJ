@@ -504,6 +504,8 @@ public final class FBReader extends Activity {
 	}
 
 	private void onPreferencesUpdate(Book book) {
+		AndroidFontUtil.clearFontCache();
+
 		final BookModel model = myFBReaderApp.Model;
 		if (book == null || model == null || model.Book == null) {
 			return;
@@ -517,7 +519,6 @@ public final class FBReader extends Activity {
 		if (newEncoding != null && !newEncoding.equals(oldEncoding)) {
 			myFBReaderApp.reloadBook();
 		} else {
-			AndroidFontUtil.clearFontCache();
 			ZLTextHyphenator.Instance().load(model.Book.getLanguage());
 			myFBReaderApp.clearTextCaches();
 			myFBReaderApp.getViewWidget().repaint();
